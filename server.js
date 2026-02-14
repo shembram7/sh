@@ -54,7 +54,7 @@ const GAME_REWARD = 10;
 async function addHistory(userId, amount, method, type, status, txnId = "") {
     if (!db) return;
     // ✅ ফিক্স: এখানে Backtick ব্যবহার করা হয়েছে
-    const historyRef = db.ref(walletHistory/${userId});
+    const historyRef = db.ref(`walletHistory/${userId}`);
     const newHistoryRef = historyRef.push();
     
     await newHistoryRef.set({
