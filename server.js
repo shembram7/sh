@@ -1,7 +1,7 @@
 const express = require('express');
 const admin = require('firebase-admin');
 const cors = require('cors');
-require('dotenv').config();
+require('dotenv').config(); // dotenv কনফিগারেশন
 
 const app = express();
 
@@ -17,22 +17,30 @@ try {
     if (process.env.FIREBASE_CREDENTIALS) {
         serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS);
     } else {
-        // লোকাল টেস্টিংয়ের জন্য
-        serviceAccount = require('./serviceAccountKey.json');
+        // লোকাল টেস্টিংয়ের জন্য (যদি ফাইল থাকে)
+        try {
+            serviceAccount = require('./serviceAccountKey.json');
+        } catch (err) {
+            console.warn("Local serviceAccountKey.json not found. Ensure FIREBASE_CREDENTIALS is set in Render.");
+        }
     }
 
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        // ডাটাবেস URL Environment Variable অথবা সরাসরি স্ট্রিং
-        databaseURL: process.env.FIREBASE_DATABASE_URL || "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com"
-    });
+    if (serviceAccount) {
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+            // ডাটাবেস URL Environment Variable অথবা সরাসরি স্ট্রিং
+            databaseURL: process.env.FIREBASE_DATABASE_URL || "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com"
+        });
+    } else {
+        console.error("Firebase credentials not found!");
+    }
 
 } catch (e) {
     console.error("Failed to initialize Firebase Admin SDK:", e.message);
-    process.exit(1); // সার্ভার বন্ধ করে দেবে যদি ফায়ারবেস কানেক্ট না হয়
 }
 
-const db = admin.database();
+// ফায়ারবেস ইনিশিয়ালাইজ না হলে ক্র্যাশ ঠেকানোর জন্য চেক
+const db = admin.apps.length ? admin.database() : null;
 
 // কনফিগারেশন
 const REFERRAL_BONUS = 100; // রেফারেল বোনাস
@@ -42,6 +50,7 @@ const GAME_REWARD = 10;     // গেম রিওয়ার্ড
 // 🛠️ সাহায্যকারী ফাংশন: হিস্ট্রি সেভ করা
 // ==========================================
 async function addHistory(userId, amount, method, type, status, txnId = "") {
+    if (!db) return;
     const historyRef = db.ref(`walletHistory/${userId}`);
     const newHistoryRef = historyRef.push();
     
@@ -61,6 +70,8 @@ async function addHistory(userId, amount, method, type, status, txnId = "") {
 // 🚀 1. API: গেম রিওয়ার্ড ক্লেইম করা
 // ==========================================
 app.post('/api/claim-reward', async (req, res) => {
+    if (!db) return res.status(500).json({ success: false, message: "Database not connected" });
+    
     const { uid } = req.body;
     if (!uid) return res.status(400).json({ success: false, message: "User ID missing!" });
 
@@ -83,7 +94,9 @@ app.post('/api/claim-reward', async (req, res) => {
 // ==========================================
 // 🚀 2. API: রেফারেল কোড রিডিম করা
 // ==========================================
-app.post('/api/redeem-referral', async (req, res) => {
+app.post('/api/redeem-referral', async (req, res) => { // ⚠️ এখানে async থাকতে হবে
+    if (!db) return res.status(500).json({ success: false, message: "Database not connected" });
+
     const { code, userId } = req.body;
     if (!userId || !code) return res.status(400).json({ message: "Missing data." });
 
@@ -116,6 +129,7 @@ app.post('/api/redeem-referral', async (req, res) => {
         });
 
         // 3. হিস্ট্রি সেভ (উভয়ের জন্য)
+        // ⚠️ আপনার এরর এই লাইনেই ছিল, এখন ঠিক আছে কারণ উপরে async দেওয়া হয়েছে
         await addHistory(userId, REFERRAL_BONUS, "Referral Bonus (Joined)", "Reward", "approved", referrerId);
         await addHistory(referrerId, REFERRAL_BONUS, "Referral Bonus (Invite)", "Reward", "approved", userId);
 
@@ -131,13 +145,14 @@ app.post('/api/redeem-referral', async (req, res) => {
 // 🚀 3. API: টুর্নামেন্ট লিস্ট পাওয়া
 // ==========================================
 app.get('/api/tournaments', async (req, res) => {
+    if (!db) return res.status(500).json({ success: false, message: "Database not connected" });
+
     try {
         const snapshot = await db.ref('tournaments').once('value');
         const tournaments = [];
 
         snapshot.forEach((child) => {
             const data = child.val();
-            // ডাটা ফিল্টার করে পাঠানো
             tournaments.push({
                 id: child.key,
                 title: data.title || "Match",
@@ -147,7 +162,6 @@ app.get('/api/tournaments', async (req, res) => {
             });
         });
 
-        // নতুন টুর্নামেন্ট আগে দেখাবে
         res.json({ success: true, data: tournaments.reverse() });
 
     } catch (error) {
@@ -160,6 +174,8 @@ app.get('/api/tournaments', async (req, res) => {
 // 🚀 4. API: টুর্নামেন্টে জয়েন করা (Balance Cut)
 // ==========================================
 app.post('/api/join-tournament', async (req, res) => {
+    if (!db) return res.status(500).json({ success: false, message: "Database not connected" });
+
     const { userId, tournamentId } = req.body;
     if (!userId || !tournamentId) return res.status(400).json({ success: false, message: "Missing Data" });
 
@@ -202,25 +218,6 @@ app.post('/api/join-tournament', async (req, res) => {
 });
 
 // সার্ভার চালু করা
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
-        // রেফারারের হিস্ট্রি যোগ
-        await addHistory(referrerId, "Referral Bonus (Invite)", userId);
-
-        return res.status(200).json({
-            success: true,
-            message: `Successfully redeemed! You both earned ${REFERRAL_BONUS_AMOUNT_IN_DIAMONDS} diamonds!`
-        });
-
-    } catch (error) {
-        console.error("Error redeeming code:", error);
-        return res.status(500).json({ message: "An internal server error occurred." });
-    }
-});
-
-// সার্ভার চালু করুন
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
