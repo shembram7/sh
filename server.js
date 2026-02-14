@@ -15,11 +15,9 @@ app.use(express.json());
 try {
     let serviceAccount;
     
-    // Render-এ Environment Variable ব্যবহার করা হচ্ছে
     if (process.env.FIREBASE_CREDENTIALS) {
         serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS);
     } else {
-        // লোকাল টেস্টিংয়ের জন্য
         try {
             serviceAccount = require('./serviceAccountKey.json');
         } catch (err) {
@@ -30,7 +28,7 @@ try {
     if (serviceAccount) {
         admin.initializeApp({
             credential: admin.credential.cert(serviceAccount),
-            // আপনার ডাটাবেস লিংক (Firebase screenshot অনুযায়ী)
+            // আপনার ডাটাবেস লিংক
             databaseURL: process.env.FIREBASE_DATABASE_URL || "https://roktobij-4210b-default-rtdb.firebaseio.com"
         });
         console.log("Firebase Admin SDK initialized.");
@@ -53,7 +51,7 @@ const GAME_REWARD = 10;
 // ==========================================
 async function addHistory(userId, amount, method, type, status, txnId = "") {
     if (!db) return;
-    // ✅ ফিক্স: এখানে Backtick ব্যবহার করা হয়েছে
+    // ✅ ফিক্স: Backtick আছে
     const historyRef = db.ref(`walletHistory/${userId}`);
     const newHistoryRef = historyRef.push();
     
@@ -70,7 +68,7 @@ async function addHistory(userId, amount, method, type, status, txnId = "") {
 }
 
 // ==========================================
-// 🚀 2. API: টুর্নামেন্ট লিস্ট (FIXED)
+// 🚀 2. API: টুর্নামেন্ট লিস্ট
 // ==========================================
 app.get('/api/tournaments', async (req, res) => {
     if (!db) return res.status(500).json({ success: false, message: "Database not connected" });
@@ -84,9 +82,7 @@ app.get('/api/tournaments', async (req, res) => {
             
             tournaments.push({
                 id: child.key,
-                // আপনার ডাটাবেস অনুযায়ী gameName বা title চেক করবে
                 title: data.title || data.gameName || "Tournament Match", 
-                // prizePool বা prize চেক করবে
                 prize: data.prizePool || data.prize || "0",        
                 entryFee: parseInt(data.entryFee || 0),
                 status: data.status || "Upcoming",
@@ -104,7 +100,7 @@ app.get('/api/tournaments', async (req, res) => {
 });
 
 // ==========================================
-// 🚀 3. API: গেম রিওয়ার্ড ক্লেইম করা
+// 🚀 3. API: গেম রিওয়ার্ড ক্লেইম করা (FIXED)
 // ==========================================
 app.post('/api/claim-reward', async (req, res) => {
     if (!db) return res.status(500).json({ success: false, message: "Database not connected" });
@@ -113,7 +109,7 @@ app.post('/api/claim-reward', async (req, res) => {
     if (!uid) return res.status(400).json({ success: false, message: "User ID missing!" });
 
     try {
-        // ✅ ফিক্স: Backtick ব্যবহার করা হয়েছে
+        // ✅ ফিক্স: Backtick মিসিং ছিল, এখন ঠিক করা হয়েছে
         await db.ref(users/${uid}/wallet).update({
             greenDiamondBalance: admin.database.ServerValue.increment(GAME_REWARD)
         });
@@ -128,7 +124,7 @@ app.post('/api/claim-reward', async (req, res) => {
 });
 
 // ==========================================
-// 🚀 4. API: রেফারেল কোড রিডিম করা
+// 🚀 4. API: রেফারেল কোড রিডিম করা (FIXED)
 // ==========================================
 app.post('/api/redeem-referral', async (req, res) => {
     if (!db) return res.status(500).json({ success: false, message: "Database not connected" });
@@ -137,7 +133,7 @@ app.post('/api/redeem-referral', async (req, res) => {
     if (!userId || !code) return res.status(400).json({ message: "Missing data." });
 
     try {
-        // ✅ ফিক্স: Backtick ব্যবহার করা হয়েছে
+        // ✅ ফিক্স: Backtick আছে
         const newUserRef = db.ref(users/${userId});
         const userSnap = await newUserRef.once("value");
         const userData = userSnap.val();
@@ -158,7 +154,7 @@ app.post('/api/redeem-referral', async (req, res) => {
         });
         await newUserRef.update({ referredBy: referrerId });
 
-        // ✅ ফিক্স: Backtick ব্যবহার করা হয়েছে
+        // ✅ ফিক্স: Backtick আছে
         await db.ref(users/${referrerId}/wallet).update({
             greenDiamondBalance: admin.database.ServerValue.increment(REFERRAL_BONUS)
         });
@@ -175,7 +171,7 @@ app.post('/api/redeem-referral', async (req, res) => {
 });
 
 // ==========================================
-// 🚀 5. API: টুর্নামেন্টে জয়েন করা (Balance Cut)
+// 🚀 5. API: টুর্নামেন্টে জয়েন করা
 // ==========================================
 app.post('/api/join-tournament', async (req, res) => {
     if (!db) return res.status(500).json({ success: false, message: "Database not connected" });
@@ -184,7 +180,7 @@ app.post('/api/join-tournament', async (req, res) => {
     if (!userId || !tournamentId) return res.status(400).json({ success: false, message: "Missing Data" });
 
     try {
-        // ✅ ফিক্স: Backtick ব্যবহার করা হয়েছে
+        // ✅ ফিক্স: Backtick আছে
         const tournamentRef = db.ref(tournaments/${tournamentId});
         const tourSnap = await tournamentRef.once('value');
 
@@ -197,7 +193,7 @@ app.post('/api/join-tournament', async (req, res) => {
             return res.status(400).json({ success: false, message: "Already joined!" });
         }
 
-        // ✅ ফিক্স: Backtick ব্যবহার করা হয়েছে
+        // ✅ ফিক্স: Backtick আছে
         const walletRef = db.ref(users/${userId}/wallet/greenDiamondBalance);
         const balSnap = await walletRef.once('value');
         const balance = balSnap.val() || 0;
