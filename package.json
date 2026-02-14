@@ -1,5 +1,5 @@
 {
-  "name": "game-reward-server",
+  "name": "sh",
   "version": "1.0.0",
   "description": "Node.js server for Telegram Mini App rewards",
   "main": "server.js",
