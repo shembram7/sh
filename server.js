@@ -29,7 +29,7 @@ try {
         admin.initializeApp({
             credential: admin.credential.cert(serviceAccount),
             // ডাটাবেস URL Environment Variable অথবা সরাসরি স্ট্রিং
-            databaseURL: process.env.FIREBASE_DATABASE_URL || "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com"
+            databaseURL: process.env.FIREBASE_DATABASE_URL || "https://roktobij-4210b-default-rtdb.firebaseio.com"
         });
     } else {
         console.error("Firebase credentials not found!");
